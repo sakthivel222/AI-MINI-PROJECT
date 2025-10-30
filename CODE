@@ -1,1 +1,65 @@
+import cv2
+import numpy as np
+import time
+
+def get_green_light_duration(vehicle_count):
+    if vehicle_count > 15:
+        return 40
+    elif vehicle_count > 10:
+        return 30
+    elif vehicle_count > 5:
+        return 20
+    else:
+        return 10
+
+def run_live_camera():
+    cap = cv2.VideoCapture(0)
+
+    if not cap.isOpened():
+        return
+
+    subtractor = cv2.createBackgroundSubtractorMOG2(history=100, varThreshold=40)
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        frame = cv2.resize(frame, (640, 480))
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+
+        mask = subtractor.apply(blur)
+        mask = cv2.erode(mask, None, iterations=2)
+        mask = cv2.dilate(mask, None, iterations=2)
+
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        moving_objects = 0
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area > 800:
+                moving_objects += 1
+                x, y, w, h = cv2.boundingRect(cnt)
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+        green_duration = get_green_light_duration(moving_objects)
+
+        cv2.putText(frame, "AI Traffic Light System (Live)", (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+        cv2.putText(frame, f"Moving Objects: {moving_objects}", (10, 60),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        cv2.putText(frame, f"Green Light Duration: {green_duration} sec", (10, 90),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+
+        cv2.imshow("🚗 Live Traffic Detection (Motion)", frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    run_live_camera()
 
